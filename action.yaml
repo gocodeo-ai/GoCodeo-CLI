@@ -1,0 +1,61 @@
+name: "GoCodeo CLI"
+description: "This Action installs gocodeo for generating tests."
+
+inputs:
+  path:
+    description: "The path to the project"
+    required: true
+  secret:
+    description: "Secret for gocodeo"
+    required: true
+  branch:
+    description: "The branch to commit changes"
+    required: true
+  PAT:
+    description: "Personal Access Token"
+    required: true
+  EMAIL:
+    description: "User email for git config"
+    required: true
+  NAME:
+    description: "User name for git config"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set path variable
+      id: set-path
+      run: echo "::set-output name=path::${{ inputs.path }}"
+      shell: bash
+
+    - name: Install gocodeo
+      run: pip install gocodeo==0.0.0.15
+      shell: bash
+
+    - name: Generating test cases
+      run: |
+        echo "${{ inputs.secret }}" | gocodeo-advanced generate ${{ steps.set-path.outputs.path }}
+      shell: bash
+
+    - name: Check if branch exists
+      run: git fetch origin ${{ inputs.branch }}:${{ inputs.branch }} && git checkout ${{ inputs.branch }}
+      shell: bash
+
+    - name: Commit and push changes
+      env:
+        PAT: ${{ inputs.PAT }}
+        EMAIL: ${{ inputs.EMAIL }}
+        NAME: ${{ inputs.NAME }}
+      run: |
+        git config --local user.email "${EMAIL}"
+        git config --local user.name "${NAME}"
+        git checkout ${{ inputs.branch }}
+        git pull origin ${{ inputs.branch }}
+        git add ${{ steps.set-path.outputs.path }}
+        git commit -m "Add generated test cases"
+        git push origin HEAD:${{ github.event.pull_request.head.ref }}
+      shell: bash
